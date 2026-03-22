@@ -518,8 +518,8 @@
       <div class="field">
         <label>Formato de Saída</label>
         <select id="fmt-select">
-          <option value="csv">CSV (separado por ponto-e-vírgula)</option>
           <option value="xlsx">XLSX (Excel)</option>
+          <option value="csv">CSV (separado por ponto-e-vírgula)</option>
         </select>
       </div>
       <div class="field">
@@ -921,8 +921,8 @@ function downloadXLSX(rows, name) {
   // Even group → white (#FFFFFF), Odd group → light gray (#EFEFEF)
   // Header → dark teal
   const COLORS = {
-    headerBg:   '1F4E79',   // dark blue header bg
-    headerFg:   'FFFFFF',
+    headerBg:   'D0D0D0',   // dark blue header bg
+    headerFg:   '000000',
     even:       'FFFFFF',   // group 0, 2, 4 …
     odd:        'EDEDF0',   // group 1, 3, 5 …
     border:     'C0C0C8',
