@@ -717,6 +717,9 @@ clearBtn.addEventListener('click', () => {
 // ═══════════════════════════════════════
 const LANTHANIDES = ['La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu'];
 
+// Canonical output order — files that don't match any lanthanide get 'MC'
+const LN_ORDER = ['Nd','Eu','Tb','Tm','Yb','MC'];
+
 function detectLanthanide(filename) {
   for (const ln of LANTHANIDES) {
     if (new RegExp(`[_\\-\\.]${ln}[_\\-\\.]`,'i').test(filename)) return ln;
@@ -727,7 +730,7 @@ function detectLanthanide(filename) {
     const f = LANTHANIDES.find(ln => p === ln || p.toLowerCase() === ln.toLowerCase());
     if (f) return f;
   }
-  return '?';
+  return 'MC';   // was '?' — unrecognised = MC
 }
 
 // ═══════════════════════════════════════
@@ -769,10 +772,13 @@ function parseGaussianLog(text, filename) {
     const nmFmt   = s.nm.replace('.', ',');
     const foscFmt = parseFloat(s.fosc).toFixed(4).replace('.', ',');
     const pairs   = [];
-    for (let i = 0; i < s.transitions.length; i += 2)
-      pairs.push(i+1 < s.transitions.length
-        ? `${s.transitions[i]}; ${s.transitions[i+1]};`
-        : `${s.transitions[i]};`);
+    for (let i = 0; i < s.transitions.length; i += 2) {
+      const isLastPair = (i + 2) >= s.transitions.length;
+      const line = i+1 < s.transitions.length
+        ? `${s.transitions[i]}; ${s.transitions[i+1]}${isLastPair ? '' : ';'}`
+        : `${s.transitions[i]}`;
+      pairs.push(line);
+    }
     return {
       Arquivo_Calculo:     baseName,
       Lantaideo:           lanthanide,
@@ -854,6 +860,15 @@ runBtn.addEventListener('click', async () => {
     }
 
     if (sheetRows.length > 0) {
+      // Sort rows by canonical lanthanide order: Nd, Eu, Tb, Tm, Yb, MC
+      // Files whose lanthanide is not in LN_ORDER go to the end
+      sheetRows.sort((a, b) => {
+        const ai = LN_ORDER.indexOf(a.Lantaideo);
+        const bi = LN_ORDER.indexOf(b.Lantaideo);
+        const av = ai === -1 ? LN_ORDER.length : ai;
+        const bv = bi === -1 ? LN_ORDER.length : bi;
+        return av - bv;
+      });
       sheets.push({ sheetName, rows: sheetRows });
       logMsg(`  ✓ ${sheetRows.length} linhas na aba "${sheetName}"`, 'ok');
     }
@@ -919,7 +934,7 @@ function downloadXLSX(sheets, name) {
 
     H.forEach((h,ci) => {
       ws[adr(ci,1)] = { v:h, t:'s', s:{
-        font:      { bold:true, color:{rgb:C.hFg}, sz:10 },
+        font:      { name:'Aptos Narrow', bold:true, color:{rgb:C.hFg}, sz:11 },
         fill:      { fgColor:{rgb:C.hBg} },
         alignment: { horizontal:'center', vertical:'center', wrapText:true },
         border:    brd(C.brd)
@@ -938,7 +953,7 @@ function downloadXLSX(sheets, name) {
     groups.forEach((g, gi) => {
       const bg = gi%2===0 ? C.even : C.odd;
       const cs = (align='center', bold=false) => ({
-        font:      { sz:10, bold, color:{rgb:'1A1A2E'} },
+        font:      { name:'Aptos Narrow', sz:11, bold, color:{rgb:'1A1A2E'} },
         fill:      { fgColor:{rgb:bg} },
         alignment: { horizontal:align, vertical:'center', wrapText:true },
         border:    brd(C.brd)
