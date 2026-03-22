@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TDDFT Log Parser — Estados Excitados</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d29922;
+    --danger: #f85149;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --radius: 6px;
+    --glow: 0 0 20px rgba(88, 166, 255, 0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  /* === HEADER === */
+  header {
+    width: 100%;
+    max-width: 860px;
+    margin-bottom: 40px;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 300;
+    max-width: 560px;
+    line-height: 1.6;
+  }
+
+  /* === MAIN CARD === */
+  .card {
+    width: 100%;
+    max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .card-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.red { background: #f85149; }
+  .dot.yellow { background: #d29922; }
+  .dot.green { background: #3fb950; }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+
+  .card-body { padding: 28px; }
+
+  /* === DROP ZONE === */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 50px 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    background: rgba(22, 27, 34, 0.5);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.05);
+    box-shadow: var(--glow);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+  }
+
+  .drop-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+    filter: grayscale(0.3);
+  }
+
+  .drop-label {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .drop-label strong { color: var(--accent); }
+
+  .drop-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  /* === FILE LIST === */
+  #file-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    animation: slideIn 0.2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .file-icon { font-size: 18px; flex-shrink: 0; }
+
+  .file-info { flex: 1; min-width: 0; }
+
+  .file-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .file-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+
+  .file-status.pending  { background: rgba(210, 153, 34, 0.15); color: var(--accent3); border: 1px solid rgba(210, 153, 34, 0.3); }
+  .file-status.ok       { background: rgba(63, 185, 80, 0.15); color: var(--accent2); border: 1px solid rgba(63, 185, 80, 0.3); }
+  .file-status.error    { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.3); }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .remove-btn:hover { color: var(--danger); }
+
+  /* === OPTIONS === */
+  .options-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .field select, .field input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    cursor: pointer;
+  }
+
+  .field select:focus, .field input:focus {
+    border-color: var(--accent);
+  }
+
+  .field input { width: 220px; }
+
+  /* === BUTTONS === */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius);
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d1117;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #79c0ff;
+    box-shadow: 0 0 16px rgba(88, 166, 255, 0.4);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+  }
+
+  .btn-success {
+    background: var(--accent2);
+    color: #0d1117;
+  }
+  .btn-success:hover {
+    background: #56d364;
+    box-shadow: 0 0 16px rgba(63, 185, 80, 0.4);
+  }
+
+  /* === PROGRESS === */
+  #progress-section {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .progress-bar-wrap {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #79c0ff);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+  }
+
+  .progress-text {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* === LOG === */
+  #log-section {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .log-box {
+    background: #0a0e14;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    max-height: 180px;
+    overflow-y: auto;
+    color: var(--text-muted);
+  }
+
+  .log-box .log-ok    { color: var(--accent2); }
+  .log-box .log-warn  { color: var(--accent3); }
+  .log-box .log-error { color: var(--danger); }
+  .log-box .log-info  { color: var(--accent); }
+
+  /* === PREVIEW TABLE === */
+  #preview-section {
+    display: none;
+    width: 100%;
+    max-width: 860px;
+  }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .preview-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .preview-count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    background: rgba(63, 185, 80, 0.1);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  thead th {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: rgba(88, 166, 255, 0.04); }
+  tbody tr:last-child { border-bottom: none; }
+
+  tbody td {
+    padding: 9px 14px;
+    color: var(--text);
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  td.numeric { text-align: right; color: var(--accent); }
+  td.state { color: var(--accent3); }
+  td.ln { color: var(--accent2); font-weight: 500; }
+
+  /* alternating group rows */
+  tr.grp-even { background: rgba(255,255,255,0.03); }
+  tr.grp-odd  { background: rgba(120,130,160,0.10); }
+  tr.grp-even:hover { background: rgba(88,166,255,0.07) !important; }
+  tr.grp-odd:hover  { background: rgba(88,166,255,0.07) !important; }
+
+  /* merged cell styling */
+  td.merge-cell {
+    vertical-align: middle;
+    font-weight: 600;
+    color: var(--accent);
+    border-right: 2px solid rgba(88,166,255,0.3) !important;
+    background: inherit;
+    font-size: 11px;
+  }
+  td.orbs-cell {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 11px;
+    border-left: 2px solid rgba(88,166,255,0.3) !important;
+  }
+
+  .more-rows {
+    text-align: center;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">Gaussian 09 / 16 · TDDFT</span>
+  <h1>Log <span>→</span> Planilha</h1>
+  <p class="subtitle">Extrai automaticamente estados excitados, comprimento de onda, força do oscilador e transições de arquivos <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">.log</code> do Gaussian.</p>
+</header>
+
+<!-- UPLOAD CARD -->
+<div class="card">
+  <div class="card-header">
+    <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+    <span class="card-title">entrada de arquivos</span>
+  </div>
+  <div class="card-body">
+
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" multiple accept=".log,.txt">
+      <span class="drop-icon">🧪</span>
+      <div class="drop-label"><strong>Arraste</strong> os arquivos .log aqui<br>ou clique para selecionar</div>
+      <div class="drop-hint">Múltiplos arquivos suportados · Gaussian 09/16 TDDFT</div>
+    </div>
+
+    <div id="file-list"></div>
+
+    <div class="options-row">
+      <div class="field">
+        <label>Formato de Saída</label>
+        <select id="fmt-select">
+          <option value="csv">CSV (separado por ponto-e-vírgula)</option>
+          <option value="xlsx">XLSX (Excel)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nome do Arquivo</label>
+        <input type="text" id="fname-input" value="TDDFT_gas_estados_excitados" placeholder="nome_saida">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="run-btn" disabled>
+        <span>▶</span> Processar e Baixar
+      </button>
+      <button class="btn btn-secondary" id="clear-btn">
+        <span>✕</span> Limpar
+      </button>
+    </div>
+
+    <div id="progress-section">
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" id="prog-fill"></div></div>
+      <div class="progress-text" id="prog-text">Aguardando...</div>
+    </div>
+
+    <div id="log-section">
+      <div class="log-box" id="log-box"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PREVIEW CARD -->
+<div id="preview-section">
+  <div class="card">
+    <div class="card-header">
+      <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+      <span class="card-title">pré-visualização dos dados extraídos</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div style="padding:16px 20px 10px">
+        <div class="preview-header">
+          <span class="preview-title">Mostrando primeiras linhas</span>
+          <span class="preview-count" id="row-count">0 estados</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Arquivo</th>
+              <th>Lantanídeo</th>
+              <th>Estado</th>
+              <th>λ (nm)</th>
+              <th>Força Osc.</th>
+              <th>Transições (prévia)</th>
+              <th>Orbitais (prévia)</th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody"></tbody>
+        </table>
+        <div class="more-rows" id="more-rows" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- xlsx-js-style: SheetJS + cell styling support -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let files = [];
+
+// ═══════════════════════════════════════════════
+//  DOM REFS
+// ═══════════════════════════════════════════════
+const dropZone    = document.getElementById('drop-zone');
+const fileInput   = document.getElementById('file-input');
+const fileListEl  = document.getElementById('file-list');
+const runBtn      = document.getElementById('run-btn');
+const clearBtn    = document.getElementById('clear-btn');
+const fmtSelect   = document.getElementById('fmt-select');
+const fnameInput  = document.getElementById('fname-input');
+const progSection = document.getElementById('progress-section');
+const progFill    = document.getElementById('prog-fill');
+const progText    = document.getElementById('prog-text');
+const logSection  = document.getElementById('log-section');
+const logBox      = document.getElementById('log-box');
+const previewSec  = document.getElementById('preview-section');
+const previewBody = document.getElementById('preview-tbody');
+const rowCount    = document.getElementById('row-count');
+const moreRows    = document.getElementById('more-rows');
+
+// ═══════════════════════════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════════════════════════
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  addFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value = ''; });
+
+// ═══════════════════════════════════════════════
+//  FILE MANAGEMENT
+// ═══════════════════════════════════════════════
+function addFiles(newFiles) {
+  newFiles.forEach(f => {
+    if (files.find(x => x.name === f.name && x.size === f.size)) return;
+    files.push(f);
+  });
+  renderFileList();
+  runBtn.disabled = files.length === 0;
+}
+
+function removeFile(idx) {
+  files.splice(idx, 1);
+  renderFileList();
+  runBtn.disabled = files.length === 0;
+  if (files.length === 0) {
+    previewSec.style.display = 'none';
+    progSection.style.display = 'none';
+    logSection.style.display = 'none';
+  }
+}
+
+function renderFileList() {
+  fileListEl.innerHTML = '';
+  files.forEach((f, i) => {
+    const kb = (f.size / 1024).toFixed(1);
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `
+      <span class="file-icon">📄</span>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-meta">${kb} KB</div>
+      </div>
+      <span class="file-status pending" id="status-${i}">pendente</span>
+      <button class="remove-btn" onclick="removeFile(${i})">✕</button>
+    `;
+    fileListEl.appendChild(div);
+  });
+}
+
+clearBtn.addEventListener('click', () => {
+  files = [];
+  fileListEl.innerHTML = '';
+  runBtn.disabled = true;
+  previewSec.style.display = 'none';
+  progSection.style.display = 'none';
+  logSection.style.display = 'none';
+  logBox.innerHTML = '';
+});
+
+// ═══════════════════════════════════════════════
+//  LANTHANIDE DETECTION
+// ═══════════════════════════════════════════════
+const LANTHANIDES = [
+  'La','Ce','Pr','Nd','Pm','Sm','Eu','Gd',
+  'Tb','Dy','Ho','Er','Tm','Yb','Lu'
+];
+
+function detectLanthanide(filename) {
+  for (const ln of LANTHANIDES) {
+    // match _Nd_ or _Nd. or similar word-boundary patterns
+    const re = new RegExp(`[_\\-\\.]${ln}[_\\-\\.]`, 'i');
+    if (re.test(filename)) return ln;
+    // also try uppercase exact
+    const re2 = new RegExp(`\\b${ln}\\b`);
+    if (re2.test(filename)) return ln;
+  }
+  // fallback: scan filename for 2-letter lanthanide symbols
+  const base = filename.replace(/\.[^.]+$/, '');
+  const parts = base.split(/[_\-\.]/);
+  for (const p of parts) {
+    const found = LANTHANIDES.find(ln => p === ln || p.toLowerCase() === ln.toLowerCase());
+    if (found) return found;
+  }
+  return '?';
+}
+
+// ═══════════════════════════════════════════════
+//  LOG PARSER
+// ═══════════════════════════════════════════════
+function parseGaussianLog(text, filename) {
+  const rows = [];
+  const lines = text.split('\n');
+  const baseName = filename.replace(/\.(log|txt)$/i, '') + '.log';
+  const lanthanide = detectLanthanide(filename);
+
+  const excStateRe = /Excited State\s+(\d+):\s+\S+\s+([-\d.]+)\s+eV\s+([-\d.]+)\s+nm\s+f=([-\d.]+)/;
+  // transition line: "  237A -> 254A  -0.27051"  or  "  216 -> 255  -0.11595"
+  const transRe = /^\s{3,}(\d+[AB]?)\s*(->|<-)\s*(\d+[AB]?)\s+[-\d.]+\s*$/;
+
+  let current = null;
+  const allOrbitalsSet = new Set(); // all unique orbital NUMBERS across entire file
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const em = excStateRe.exec(line);
+    if (em) {
+      if (current) rows.push(current);
+      current = {
+        estado: parseInt(em[1]),
+        nm: em[3].trim(),
+        fosc: em[4].trim(),
+        transitions: []
+      };
+      continue;
+    }
+
+    if (current) {
+      const tm = transRe.exec(line);
+      if (tm) {
+        const fullFrom = tm[1]; // e.g. "237A" or "216"
+        const arrow    = tm[2];
+        const fullTo   = tm[3]; // e.g. "254A" or "255"
+        current.transitions.push(`${fullFrom} ${arrow} ${fullTo}`);
+        // extract just the number for the orbital set
+        allOrbitalsSet.add(parseInt(fullFrom));
+        allOrbitalsSet.add(parseInt(fullTo));
+      }
+    }
+  }
+  if (current) rows.push(current);
+
+  // Sort all unique orbital numbers for this file
+  const allOrbitalsStr = [...allOrbitalsSet].sort((a, b) => a - b).join('; ');
+
+  // Now build final rows with the shared orbital list
+  return rows.map(s => buildRow(s, baseName, lanthanide, allOrbitalsStr));
+}
+
+function buildRow(s, baseName, lanthanide, allOrbitalsStr) {
+  const nmFmt   = s.nm.replace('.', ',');
+  const foscFmt = parseFloat(s.fosc).toFixed(4).replace('.', ',');
+
+  // 2 transições por linha separadas por \n
+  const transPairs = [];
+  for (let i = 0; i < s.transitions.length; i += 2) {
+    const pair = i + 1 < s.transitions.length
+      ? `${s.transitions[i]}; ${s.transitions[i+1]};`
+      : `${s.transitions[i]};`;
+    transPairs.push(pair);
+  }
+  const transStr = transPairs.join('\n');
+
+  return {
+    Arquivo_Calculo: baseName,
+    Lantaideo: lanthanide,
+    Estado_Excitado: s.estado,
+    Comprimento_onda_nm: nmFmt,
+    Forca_Oscilador: foscFmt,
+    Transicoes: transStr,
+    Orbitais: allOrbitalsStr
+  };
+}
+
+// ═══════════════════════════════════════════════
+//  LOGGING HELPERS
+// ═══════════════════════════════════════════════
+function logMsg(msg, cls='') {
+  const span = document.createElement('span');
+  span.className = cls ? `log-${cls}` : '';
+  span.textContent = msg;
+  logBox.appendChild(span);
+  logBox.appendChild(document.createTextNode('\n'));
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function setProgress(pct, msg) {
+  progFill.style.width = pct + '%';
+  progText.textContent = msg;
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN: RUN
+// ═══════════════════════════════════════════════
+runBtn.addEventListener('click', async () => {
+  if (files.length === 0) return;
+
+  // reset UI
+  logBox.innerHTML = '';
+  logSection.style.display = 'block';
+  progSection.style.display = 'block';
+  previewSec.style.display = 'none';
+  previewBody.innerHTML = '';
+  runBtn.disabled = true;
+
+  const allRows = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    setProgress(Math.round((i / files.length) * 90), `Lendo ${f.name}…`);
+    logMsg(`→ Processando: ${f.name}`, 'info');
+
+    try {
+      const text = await readFile(f);
+      const rows = parseGaussianLog(text, f.name);
+
+      if (rows.length === 0) {
+        document.getElementById(`status-${i}`).textContent = 'sem dados';
+        document.getElementById(`status-${i}`).className = 'file-status error';
+        logMsg(`   ⚠ Nenhum estado excitado encontrado em ${f.name}`, 'warn');
+      } else {
+        document.getElementById(`status-${i}`).textContent = `${rows.length} estados`;
+        document.getElementById(`status-${i}`).className = 'file-status ok';
+        logMsg(`   ✓ ${rows.length} estados extraídos · Lantanídeo: ${rows[0].Lantaideo}`, 'ok');
+        allRows.push(...rows);
+      }
+    } catch (err) {
+      document.getElementById(`status-${i}`).textContent = 'erro';
+      document.getElementById(`status-${i}`).className = 'file-status error';
+      logMsg(`   ✗ Erro ao ler ${f.name}: ${err.message}`, 'error');
+    }
+  }
+
+  setProgress(95, 'Gerando arquivo…');
+
+  if (allRows.length === 0) {
+    logMsg('✗ Nenhum dado extraído. Verifique se os arquivos são .log do Gaussian com cálculo TDDFT.', 'error');
+    setProgress(0, 'Falhou.');
+    runBtn.disabled = false;
+    return;
+  }
+
+  const fmt  = fmtSelect.value;
+  const name = (fnameInput.value.trim() || 'TDDFT_estados_excitados');
+
+  if (fmt === 'csv') {
+    downloadCSV(allRows, name);
+  } else {
+    downloadXLSX(allRows, name);
+  }
+
+  setProgress(100, `✓ Concluído — ${allRows.length} linhas exportadas`);
+  logMsg(`✓ Arquivo gerado: ${name}.${fmt} (${allRows.length} estados)`, 'ok');
+
+  renderPreview(allRows);
+  previewSec.style.display = 'block';
+  runBtn.disabled = false;
+});
+
+// ═══════════════════════════════════════════════
+//  FILE READER
+// ═══════════════════════════════════════════════
+function readFile(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = () => rej(new Error('Falha na leitura'));
+    r.readAsText(f, 'UTF-8');
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  CSV EXPORT
+// ═══════════════════════════════════════════════
+function downloadCSV(rows, name) {
+  const HEADERS = [
+    'Arquivo_Cálculo','Lantanídeo','Estado Excitado',
+    'Comprimento de onda (nm)','Força do Oscilador','Transições','Orbitais'
+  ];
+
+  const escape = v => {
+    const s = String(v);
+    if (s.includes(';') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const lines = [HEADERS.map(escape).join(';')];
+  rows.forEach(r => {
+    lines.push([
+      escape(r.Arquivo_Calculo),
+      escape(r.Lantaideo),
+      escape(r.Estado_Excitado),
+      escape(r.Comprimento_onda_nm),
+      escape(r.Forca_Oscilador),
+      escape(r.Transicoes),
+      escape(r.Orbitais)
+    ].join(';'));
+  });
+
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  triggerDownload(blob, name + '.csv');
+}
+
+// ═══════════════════════════════════════════════
+//  XLSX EXPORT  (xlsx-js-style: merge + color)
+// ═══════════════════════════════════════════════
+function downloadXLSX(rows, name) {
+
+  // ── palette: alternating file groups ──────────
+  // Even group → white (#FFFFFF), Odd group → light gray (#EFEFEF)
+  // Header → dark teal
+  const COLORS = {
+    headerBg:   '1F4E79',   // dark blue header bg
+    headerFg:   'FFFFFF',
+    even:       'FFFFFF',   // group 0, 2, 4 …
+    odd:        'EDEDF0',   // group 1, 3, 5 …
+    border:     'C0C0C8',
+  };
+
+  // ── column definitions ─────────────────────────
+  // col indices: A=0 Arquivo, B=1 Lantanídeo, C=2 Estado, D=3 λ, E=4 Fosc, F=5 Trans, G=6 Orbitais
+  const HEADERS = [
+    'Arquivo_Cálculo','Lantanídeo','Estado Excitado',
+    'Comprimento de onda (nm)','Força do Oscilador','Transições','Orbitais'
+  ];
+
+  // ── figure out groups (runs of same Arquivo_Calculo) ──
+  // Each group: { file, startIdx, endIdx (inclusive, 0-based into rows) }
+  const groups = [];
+  rows.forEach((r, i) => {
+    if (i === 0 || r.Arquivo_Calculo !== rows[i-1].Arquivo_Calculo) {
+      groups.push({ file: r.Arquivo_Calculo, start: i, end: i });
+    } else {
+      groups[groups.length - 1].end = i;
+    }
+  });
+
+  // ── build ws cell by cell ──────────────────────
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+
+  // helper: Excel col letter from 0-based index
+  const col = i => String.fromCharCode(65 + i);
+  // helper: cell address (row is 1-based Excel row)
+  const addr = (c, r) => `${col(c)}${r}`;
+
+  // ── header row (Excel row 1) ──────────────────
+  HEADERS.forEach((h, ci) => {
+    ws[addr(ci, 1)] = {
+      v: h, t: 's',
+      s: {
+        font:      { bold: true, color: { rgb: COLORS.headerFg }, sz: 10 },
+        fill:      { fgColor: { rgb: COLORS.headerBg } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border:    borderStyle(COLORS.border)
+      }
+    };
+  });
+
+  // ── data rows ────────────────────────────────
+  const merges = [];
+
+  groups.forEach((g, gi) => {
+    const bgColor = gi % 2 === 0 ? COLORS.even : COLORS.odd;
+
+    for (let ri = g.start; ri <= g.end; ri++) {
+      const r   = rows[ri];
+      const exR = ri + 2; // Excel row (1=header, so data starts at 2)
+
+      const cellStyle = (align = 'center', bold = false) => ({
+        font:      { sz: 10, bold, color: { rgb: '1A1A2E' } },
+        fill:      { fgColor: { rgb: bgColor } },
+        alignment: { horizontal: align, vertical: 'center', wrapText: true },
+        border:    borderStyle(COLORS.border)
+      });
+
+      // A – Arquivo_Calculo (merged per group, only first row gets value)
+      ws[addr(0, exR)] = {
+        v: ri === g.start ? r.Arquivo_Calculo : '',
+        t: 's',
+        s: cellStyle('center', true)
+      };
+
+      // B – Lantanídeo (merged per group, only first row gets value)
+      ws[addr(1, exR)] = {
+        v: ri === g.start ? r.Lantaideo : '',
+        t: 's',
+        s: cellStyle('center', true)
+      };
+
+      // C – Estado Excitado
+      ws[addr(2, exR)] = { v: r.Estado_Excitado, t: 'n', s: cellStyle('center') };
+
+      // D – λ (nm)
+      ws[addr(3, exR)] = { v: r.Comprimento_onda_nm, t: 's', s: cellStyle('center') };
+
+      // E – Força do Oscilador
+      ws[addr(4, exR)] = { v: r.Forca_Oscilador, t: 's', s: cellStyle('center') };
+
+      // F – Transições (2 por linha via \n, wrapText ativo)
+      ws[addr(5, exR)] = { v: r.Transicoes, t: 's', s: cellStyle('left') };
+
+      // G – Orbitais (merged per group, only first row gets value)
+      ws[addr(6, exR)] = {
+        v: ri === g.start ? r.Orbitais : '',
+        t: 's',
+        s: cellStyle('center')
+      };
+    }
+
+    // register merges for col A, B and col G for this group
+    if (g.end > g.start) {
+      const startExR = g.start + 2;
+      const endExR   = g.end   + 2;
+      merges.push({ s: { r: startExR - 1, c: 0 }, e: { r: endExR - 1, c: 0 } }); // A
+      merges.push({ s: { r: startExR - 1, c: 1 }, e: { r: endExR - 1, c: 1 } }); // B
+      merges.push({ s: { r: startExR - 1, c: 6 }, e: { r: endExR - 1, c: 6 } }); // G
+    }
+  });
+
+  // ── sheet range ───────────────────────────────
+  ws['!ref'] = `A1:G${rows.length + 1}`;
+
+  // ── merges ────────────────────────────────────
+  ws['!merges'] = merges;
+
+  // ── column widths ─────────────────────────────
+  ws['!cols'] = [
+    {wch:36},  // A Arquivo
+    {wch:12},  // B Lantanídeo
+    {wch:14},  // C Estado
+    {wch:20},  // D λ
+    {wch:18},  // E Fosc
+    {wch:72},  // F Transições
+    {wch:55},  // G Orbitais
+  ];
+
+  // ── row heights ───────────────────────────────
+  ws['!rows'] = [{ hpt: 28 }]; // header taller
+  // data rows auto-height not settable per-row easily; leave default
+
+  XLSX.utils.book_append_sheet(wb, ws, 'TDDFT_gas');
+  XLSX.writeFile(wb, name + '.xlsx');
+}
+
+// thin border on all 4 sides
+function borderStyle(rgb) {
+  const b = { style: 'thin', color: { rgb } };
+  return { top: b, bottom: b, left: b, right: b };
+}
+
+// ═══════════════════════════════════════════════
+//  DOWNLOAD HELPER
+// ═══════════════════════════════════════════════
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ═══════════════════════════════════════════════
+//  PREVIEW TABLE  (merged cells + alternating colors)
+// ═══════════════════════════════════════════════
+function renderPreview(rows) {
+  rowCount.textContent = `${rows.length} estados`;
+  previewBody.innerHTML = '';
+
+  const limit = Math.min(rows.length, 30);
+
+  // figure out groups within the preview slice
+  let groupIdx = -1;
+  let prevFile = null;
+
+  for (let i = 0; i < limit; i++) {
+    const r = rows[i];
+    const isNewGroup = r.Arquivo_Calculo !== prevFile;
+    if (isNewGroup) { groupIdx++; prevFile = r.Arquivo_Calculo; }
+
+    const bgClass = groupIdx % 2 === 0 ? 'grp-even' : 'grp-odd';
+
+    // count how many rows this group spans (within limit)
+    let groupSpan = 0;
+    if (isNewGroup) {
+      for (let j = i; j < limit && rows[j].Arquivo_Calculo === r.Arquivo_Calculo; j++) groupSpan++;
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = bgClass;
+
+    // Col A – Arquivo (merged)
+    if (isNewGroup) {
+      const tdA = document.createElement('td');
+      tdA.rowSpan = groupSpan;
+      tdA.className = 'merge-cell';
+      tdA.style.textAlign = 'center';
+      tdA.title = r.Arquivo_Calculo;
+      tdA.textContent = r.Arquivo_Calculo.length > 32
+        ? r.Arquivo_Calculo.substring(0, 30) + '…'
+        : r.Arquivo_Calculo;
+      tr.appendChild(tdA);
+    }
+
+    // Col B – Lantanídeo (merged)
+    if (isNewGroup) {
+      const tdB = document.createElement('td');
+      tdB.rowSpan = groupSpan;
+      tdB.className = 'merge-cell ln';
+      tdB.style.textAlign = 'center';
+      tdB.textContent = r.Lantaideo;
+      tr.appendChild(tdB);
+    }
+
+    // Col C – Estado
+    const tdC = document.createElement('td');
+    tdC.className = 'state'; tdC.style.textAlign = 'center';
+    tdC.textContent = r.Estado_Excitado; tr.appendChild(tdC);
+
+    // Col D – λ
+    const tdD = document.createElement('td');
+    tdD.style.textAlign = 'center';
+    tdD.textContent = r.Comprimento_onda_nm; tr.appendChild(tdD);
+
+    // Col E – Fosc
+    const tdE = document.createElement('td');
+    tdE.style.textAlign = 'center';
+    tdE.textContent = r.Forca_Oscilador; tr.appendChild(tdE);
+
+    // Col F – Transições (2 por linha)
+    const tdF = document.createElement('td');
+    tdF.title = r.Transicoes;
+    // show first 4 transitions (2 lines) as preview
+    const transLines = r.Transicoes.split('\n');
+    const previewLines = transLines.slice(0, 2).join('\n');
+    const more = transLines.length > 2 ? `\n+${transLines.length - 2} linhas…` : '';
+    tdF.style.whiteSpace = 'pre';
+    tdF.style.fontSize = '11px';
+    tdF.textContent = previewLines + more;
+    tr.appendChild(tdF);
+
+    // Col G – Orbitais (merged)
+    if (isNewGroup) {
+      const tdG = document.createElement('td');
+      tdG.rowSpan = groupSpan;
+      tdG.className = 'merge-cell orbs-cell';
+      tdG.style.textAlign = 'center';
+      tdG.title = r.Orbitais;
+      tdG.textContent = r.Orbitais.length > 55 ? r.Orbitais.substring(0, 52) + '…' : r.Orbitais;
+      tr.appendChild(tdG);
+    }
+
+    previewBody.appendChild(tr);
+  }
+
+  if (rows.length > limit) {
+    moreRows.style.display = 'block';
+    moreRows.textContent = `… e mais ${rows.length - limit} linhas no arquivo exportado`;
+  } else {
+    moreRows.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
