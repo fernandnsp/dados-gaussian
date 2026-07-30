@@ -771,13 +771,12 @@ function parseGaussianLog(text, filename) {
   return rawStates.map(s => {
     const nmFmt   = s.nm.replace('.', ',');
     const foscFmt = parseFloat(s.fosc).toFixed(4).replace('.', ',');
-    const pairs   = [];
-    for (let i = 0; i < s.transitions.length; i += 2) {
-      const isLastPair = (i + 2) >= s.transitions.length;
-      const line = i+1 < s.transitions.length
-        ? `${s.transitions[i]}; ${s.transitions[i+1]}${isLastPair ? '' : ';'}`
-        : `${s.transitions[i]}`;
-      pairs.push(line);
+    const PER_LINE = 10;   // transições por linha antes de quebrar
+    const lineChunks = [];
+    for (let i = 0; i < s.transitions.length; i += PER_LINE) {
+      const chunk  = s.transitions.slice(i, i + PER_LINE);
+      const isLast = (i + PER_LINE) >= s.transitions.length;
+      lineChunks.push(chunk.join('; ') + (isLast ? '' : ';'));
     }
     return {
       Arquivo_Calculo:     baseName,
@@ -785,7 +784,7 @@ function parseGaussianLog(text, filename) {
       Estado_Excitado:     s.estado,
       Comprimento_onda_nm: nmFmt,
       Forca_Oscilador:     foscFmt,
-      Transicoes:          pairs.join('\n'),
+      Transicoes:          lineChunks.join('\n'),
       Orbitais:            allOrbitalsStr
     };
   });
@@ -980,9 +979,19 @@ function downloadXLSX(sheets, name) {
       }
     });
 
+    // Largura da coluna Transições = maior linha (entre quebras) presente,
+    // para que as 10 transições apareçam inteiras sem precisar arrastar.
+    const maxTransLine = Math.max(
+      20,
+      ...rows.map(r => Math.max(
+        0, ...String(r.Transicoes).split('\n').map(l => l.length)
+      ))
+    );
+    const transWch = Math.min(maxTransLine + 2, 200);   // limite de segurança
+
     ws['!ref']    = `A1:G${rows.length+1}`;
     ws['!merges'] = merges;
-    ws['!cols']   = [{wch:36},{wch:12},{wch:14},{wch:20},{wch:18},{wch:72},{wch:55}];
+    ws['!cols']   = [{wch:36},{wch:12},{wch:14},{wch:20},{wch:18},{wch:transWch},{wch:55}];
     ws['!rows']   = [{hpt:28}];
 
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
